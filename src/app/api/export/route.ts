@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase";
 import { isAuthenticated } from "@/lib/auth";
 
@@ -11,16 +11,19 @@ function csvEscape(value: unknown) {
   return s;
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   if (!(await isAuthenticated())) {
     return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
   }
 
+  const { searchParams } = new URL(req.url);
+  const municipio = searchParams.get("municipio");
+
   const supabase = getSupabaseServer();
-  const { data, error } = await supabase
-    .from("cadastros")
-    .select("*")
-    .order("created_at", { ascending: false });
+  let query = supabase.from("cadastros").select("*").order("created_at", { ascending: false });
+  if (municipio) query = query.eq("municipio", municipio);
+
+  const { data, error } = await query;
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (!data || data.length === 0) {
@@ -36,7 +39,7 @@ export async function GET() {
   return new NextResponse(csv, {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
-      "Content-Disposition": `attachment; filename="cadastros_se03_${new Date()
+      "Content-Disposition": `attachment; filename="cadastros_se03_${municipio || "todos"}_${new Date()
         .toISOString()
         .slice(0, 10)}.csv"`,
     },

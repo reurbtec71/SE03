@@ -117,6 +117,9 @@ create table if not exists cadastros (
   responsavel_coleta text,
   observacoes_lgpd text,
 
+  -- Anexos (Supabase Storage — bucket "anexos")
+  anexos jsonb default '[]'::jsonb,
+
   -- Controle / workflow
   classificacao text default 'REURB-S',
   status text default 'Pendente',

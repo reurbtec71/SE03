@@ -6,6 +6,8 @@ export const MUNICIPIOS = [
   "Carira",
 ] as const;
 
+export const CADASTRADORAS = ["Elis", "Anésia", "Maíra"] as const;
+
 export const UFS = [
   "AC","AL","AM","AP","BA","CE","DF","ES","GO","MA","MG","MS","MT","PA",
   "PB","PE","PI","PR","RJ","RN","RO","RR","RS","SC","SE","SP","TO",

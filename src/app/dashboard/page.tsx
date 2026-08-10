@@ -38,13 +38,20 @@ function Bar({ label, n, total }: { label: string; n: number; total: number }) {
 export default function DashboardPage() {
   const [dados, setDados] = useState<Cadastro[]>([]);
   const [loading, setLoading] = useState(true);
+  const [municipio, setMunicipio] = useState("");
 
   useEffect(() => {
-    fetch("/api/cadastros")
-      .then((r) => r.json())
-      .then((b) => setDados(b.data || []))
-      .finally(() => setLoading(false));
-  }, []);
+    async function carregar() {
+      setLoading(true);
+      const params = new URLSearchParams();
+      if (municipio) params.set("municipio", municipio);
+      const r = await fetch(`/api/cadastros?${params.toString()}`);
+      const b = await r.json();
+      setDados(b.data || []);
+      setLoading(false);
+    }
+    carregar();
+  }, [municipio]);
 
   const total = dados.length;
   const bool = (key: string) => dados.filter((d) => d[key] === true).length;
@@ -72,13 +79,25 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Header title="REURBTEC — Painel do Coordenador" />
+      <Header title="REURBTEC — Painel do Coordenador" municipioFiltro={municipio} />
       <div className="max-w-6xl mx-auto px-4 py-6">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="font-bold text-navy">Visão Geral do Projeto</h2>
+          <select
+            className="border border-gray-300 rounded-md px-3 py-2 text-sm"
+            value={municipio}
+            onChange={(e) => setMunicipio(e.target.value)}
+          >
+            <option value="">Todos os municípios</option>
+            {MUNICIPIOS.map((m) => (
+              <option key={m} value={m}>{m}</option>
+            ))}
+          </select>
+        </div>
         {loading ? (
           <p className="text-gray-400 text-sm">Carregando...</p>
         ) : (
           <>
-            <h2 className="font-bold text-navy mb-3">Visão Geral do Projeto</h2>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
               <Stat label="Total Cadastros" value={total} />
               <Stat label="REURB-S" value={dados.filter((d) => (d.classificacao || "REURB-S") === "REURB-S").length} sub={pct(dados.filter((d) => (d.classificacao || "REURB-S") === "REURB-S").length, total)} />

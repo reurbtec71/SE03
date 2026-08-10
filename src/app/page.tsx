@@ -62,7 +62,7 @@ export default function CadastrosPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Header title="REURBTEC — Painel do Coordenador" />
+      <Header title="REURBTEC — Painel do Coordenador" municipioFiltro={municipio} />
 
       <div className="max-w-6xl mx-auto px-4 py-6">
         <div className="flex flex-wrap gap-3 mb-4">

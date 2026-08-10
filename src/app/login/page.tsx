@@ -35,7 +35,7 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gray-100 px-4">
       <div className="bg-white rounded-xl shadow-md w-full max-w-sm p-8 text-center">
         <span className="inline-block bg-navy text-white text-sm font-bold rounded-md px-4 py-2 mb-4">
-          REURBTEC / MGX
+          REURBTEC
         </span>
         <h1 className="text-xl font-bold text-navy mb-1">
           Cadastro Habitacional — Lote 3
@@ -64,7 +64,7 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <p className="text-xs text-gray-400 mt-6">MGX Geotecnologias · REURBTEC</p>
+        <p className="text-xs text-gray-400 mt-6">REURBTEC Engenharia & Topografia</p>
       </div>
     </div>
   );

@@ -10,7 +10,9 @@ import {
   MATERIAL_PISO_OPCOES, ESTADO_CONSERVACAO_OPCOES, TIPO_USO_OPCOES,
   AGUA_OPCOES, ESGOTO_OPCOES, ENERGIA_OPCOES, COLETA_LIXO_OPCOES,
   PAVIMENTACAO_OPCOES, TIPO_RISCO_OPCOES, CONDICAO_HABITACIONAL_OPCOES,
+  CADASTRADORAS,
 } from "@/lib/constants";
+import { maskCPF } from "@/lib/format";
 
 type Props = {
   initialData?: Record<string, unknown>;
@@ -68,6 +70,115 @@ function SimNao({ value, onChange }: { value: boolean; onChange: (v: boolean) =>
       <label className="flex items-center gap-1">
         <input type="radio" checked={value === false} onChange={() => onChange(false)} /> Não
       </label>
+    </div>
+  );
+}
+
+// Campo de texto livre com maiúsculas automáticas (nomes, endereços, descrições)
+function UpperInput({
+  value, onChange, textarea, placeholder,
+}: { value: string; onChange: (v: string) => void; textarea?: boolean; placeholder?: string }) {
+  if (textarea) {
+    return (
+      <textarea
+        className={inputClass}
+        value={value}
+        placeholder={placeholder}
+        onChange={(e) => onChange(e.target.value.toUpperCase())}
+      />
+    );
+  }
+  return (
+    <input
+      className={inputClass}
+      value={value}
+      placeholder={placeholder}
+      onChange={(e) => onChange(e.target.value.toUpperCase())}
+    />
+  );
+}
+
+function CpfInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <input
+      className={inputClass}
+      value={value}
+      placeholder="000.000.000-00"
+      inputMode="numeric"
+      maxLength={14}
+      onChange={(e) => onChange(maskCPF(e.target.value))}
+    />
+  );
+}
+
+type Anexo = { nome: string; path: string; tamanho: number };
+
+function AttachmentUploader({
+  cadastroId, anexos, onChange,
+}: { cadastroId: string; anexos: Anexo[]; onChange: (a: Anexo[]) => void }) {
+  const [enviando, setEnviando] = useState(false);
+  const [erro, setErro] = useState("");
+
+  async function handleFiles(files: FileList | null) {
+    if (!files || files.length === 0) return;
+    setEnviando(true);
+    setErro("");
+    try {
+      const form = new FormData();
+      Array.from(files).forEach((f) => form.append("files", f));
+      const res = await fetch(`/api/anexos/${cadastroId}`, { method: "POST", body: form });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        setErro(body.error || "Erro ao enviar arquivo(s).");
+        return;
+      }
+      const body = await res.json();
+      onChange(body.anexos);
+    } finally {
+      setEnviando(false);
+    }
+  }
+
+  async function remover(path: string) {
+    const res = await fetch(`/api/anexos/${cadastroId}`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path }),
+    });
+    if (res.ok) {
+      const body = await res.json();
+      onChange(body.anexos);
+    }
+  }
+
+  return (
+    <div>
+      <input
+        type="file"
+        multiple
+        accept=".pdf,.jpg,.jpeg,.png"
+        onChange={(e) => handleFiles(e.target.files)}
+        disabled={enviando}
+        className="text-sm mb-2"
+      />
+      {enviando && <p className="text-xs text-gray-500">Enviando...</p>}
+      {erro && <p className="text-xs text-red-600">{erro}</p>}
+      {anexos.length > 0 && (
+        <ul className="text-sm mt-2 space-y-1">
+          {anexos.map((a) => (
+            <li key={a.path} className="flex items-center justify-between bg-gray-50 border rounded px-2 py-1">
+              <span className="truncate">{a.nome}</span>
+              <button
+                type="button"
+                onClick={() => remover(a.path)}
+                className="text-red-600 text-xs font-semibold ml-2"
+              >
+                remover
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
@@ -146,29 +257,29 @@ export default function CadastroForm({ initialData, cadastroId }: Props) {
             <Field label="Município" required>
               <Select value={v("municipio")} onChange={(x) => set("municipio", x)} options={MUNICIPIOS} />
             </Field>
-            <Field label="Distrito (2 dígitos)" required>
+            <Field label="Distrito (2 dígitos)">
               <input className={inputClass} placeholder="00" value={v("distrito")} onChange={(e) => set("distrito", e.target.value)} />
             </Field>
-            <Field label="Setor (2 dígitos)" required>
+            <Field label="Setor (2 dígitos)">
               <input className={inputClass} placeholder="00" value={v("setor")} onChange={(e) => set("setor", e.target.value)} />
             </Field>
-            <Field label="Quadra (3 dígitos)" required>
+            <Field label="Quadra (3 dígitos)">
               <input className={inputClass} placeholder="000" value={v("quadra")} onChange={(e) => set("quadra", e.target.value)} />
             </Field>
-            <Field label="Lote (4 dígitos)" required>
+            <Field label="Lote (4 dígitos)">
               <input className={inputClass} placeholder="0000" value={v("lote")} onChange={(e) => set("lote", e.target.value)} />
             </Field>
-            <Field label="Sequencial (3 dígitos)" required>
+            <Field label="Sequencial (3 dígitos)">
               <input className={inputClass} placeholder="000" value={v("sequencial")} onChange={(e) => set("sequencial", e.target.value)} />
             </Field>
             <Field label="Logradouro" required>
-              <input className={inputClass} value={v("logradouro")} onChange={(e) => set("logradouro", e.target.value)} />
+              <UpperInput value={v("logradouro")} onChange={(x) => set("logradouro", x)} />
             </Field>
             <Field label="Número" required>
-              <input className={inputClass} value={v("numero")} onChange={(e) => set("numero", e.target.value)} />
+              <UpperInput value={v("numero")} onChange={(x) => set("numero", x)} />
             </Field>
             <Field label="Complemento">
-              <input className={inputClass} value={v("complemento")} onChange={(e) => set("complemento", e.target.value)} />
+              <UpperInput value={v("complemento")} onChange={(x) => set("complemento", x)} />
             </Field>
             <Field label="CEP">
               <input className={inputClass} value={v("cep")} onChange={(e) => set("cep", e.target.value)} />
@@ -177,10 +288,10 @@ export default function CadastroForm({ initialData, cadastroId }: Props) {
               <input type="date" className={inputClass} value={v("data_cadastro")} onChange={(e) => set("data_cadastro", e.target.value)} />
             </Field>
             <Field label="Agente de Campo" required>
-              <input className={inputClass} placeholder="Nome do agente" value={v("agente_campo")} onChange={(e) => set("agente_campo", e.target.value)} />
+              <Select value={v("agente_campo")} onChange={(x) => set("agente_campo", x)} options={CADASTRADORAS} />
             </Field>
             <Field label="Coordenador">
-              <input className={inputClass} placeholder="Nome do coordenador" value={v("coordenador")} onChange={(e) => set("coordenador", e.target.value)} />
+              <Select value={v("coordenador")} onChange={(x) => set("coordenador", x)} options={CADASTRADORAS} />
             </Field>
           </>
         )}
@@ -188,16 +299,16 @@ export default function CadastroForm({ initialData, cadastroId }: Props) {
         {secao === 1 && (
           <>
             <Field label="Nome Completo" required>
-              <input className={inputClass} value={v("nome_completo")} onChange={(e) => set("nome_completo", e.target.value)} />
+              <UpperInput value={v("nome_completo")} onChange={(x) => set("nome_completo", x)} />
             </Field>
             <Field label="CPF" required>
-              <input className={inputClass} value={v("cpf")} onChange={(e) => set("cpf", e.target.value)} />
+              <CpfInput value={v("cpf")} onChange={(x) => set("cpf", x)} />
             </Field>
             <Field label="RG / Nº Identidade" required>
-              <input className={inputClass} value={v("rg")} onChange={(e) => set("rg", e.target.value)} />
+              <UpperInput value={v("rg")} onChange={(x) => set("rg", x)} />
             </Field>
             <Field label="Órgão Emissor / UF">
-              <input className={inputClass} value={v("orgao_emissor")} onChange={(e) => set("orgao_emissor", e.target.value)} />
+              <UpperInput value={v("orgao_emissor")} onChange={(x) => set("orgao_emissor", x)} />
             </Field>
             <Field label="Data de Nascimento" required>
               <input type="date" className={inputClass} value={v("data_nascimento")} onChange={(e) => set("data_nascimento", e.target.value)} />
@@ -212,19 +323,19 @@ export default function CadastroForm({ initialData, cadastroId }: Props) {
               <Select value={v("estado_civil")} onChange={(x) => set("estado_civil", x)} options={ESTADO_CIVIL_OPCOES} />
             </Field>
             <Field label="Naturalidade">
-              <input className={inputClass} value={v("naturalidade")} onChange={(e) => set("naturalidade", e.target.value)} />
+              <UpperInput value={v("naturalidade")} onChange={(x) => set("naturalidade", x)} />
             </Field>
             <Field label="UF de Nascimento" required>
               <Select value={v("uf_nascimento")} onChange={(x) => set("uf_nascimento", x)} options={UFS} />
             </Field>
             <Field label="Filiação — Mãe" required>
-              <input className={inputClass} value={v("filiacao_mae")} onChange={(e) => set("filiacao_mae", e.target.value)} />
+              <UpperInput value={v("filiacao_mae")} onChange={(x) => set("filiacao_mae", x)} />
             </Field>
             <Field label="Filiação — Pai">
-              <input className={inputClass} value={v("filiacao_pai")} onChange={(e) => set("filiacao_pai", e.target.value)} />
+              <UpperInput value={v("filiacao_pai")} onChange={(x) => set("filiacao_pai", x)} />
             </Field>
             <Field label="Bairro" required>
-              <input className={inputClass} value={v("bairro")} onChange={(e) => set("bairro", e.target.value)} />
+              <UpperInput value={v("bairro")} onChange={(x) => set("bairro", x)} />
             </Field>
             <Field label="Telefone / WhatsApp" required>
               <input className={inputClass} value={v("telefone")} onChange={(e) => set("telefone", e.target.value)} />
@@ -274,7 +385,7 @@ export default function CadastroForm({ initialData, cadastroId }: Props) {
               <SimNao value={vb("bpc")} onChange={(x) => set("bpc", x)} />
             </Field>
             <Field label="Outras transferências">
-              <input className={inputClass} value={v("outras_transferencias")} onChange={(e) => set("outras_transferencias", e.target.value)} />
+              <UpperInput value={v("outras_transferencias")} onChange={(x) => set("outras_transferencias", x)} />
             </Field>
             <Field label="Escolaridade do Responsável">
               <Select value={v("escolaridade")} onChange={(x) => set("escolaridade", x)} options={ESCOLARIDADE_OPCOES} />
@@ -283,7 +394,7 @@ export default function CadastroForm({ initialData, cadastroId }: Props) {
               <Select value={v("situacao_emprego")} onChange={(x) => set("situacao_emprego", x)} options={SITUACAO_EMPREGO_OPCOES} />
             </Field>
             <Field label="Profissão">
-              <input className={inputClass} value={v("profissao")} onChange={(e) => set("profissao", e.target.value)} />
+              <UpperInput value={v("profissao")} onChange={(x) => set("profissao", x)} />
             </Field>
           </>
         )}
@@ -312,7 +423,7 @@ export default function CadastroForm({ initialData, cadastroId }: Props) {
               <SimNao value={vb("conflito_fundiario")} onChange={(x) => set("conflito_fundiario", x)} />
             </Field>
             <Field label="Descrição do Conflito">
-              <textarea className={inputClass} value={v("descricao_conflito")} onChange={(e) => set("descricao_conflito", e.target.value)} />
+              <UpperInput textarea value={v("descricao_conflito")} onChange={(x) => set("descricao_conflito", x)} />
             </Field>
           </>
         )}
@@ -344,7 +455,7 @@ export default function CadastroForm({ initialData, cadastroId }: Props) {
               <Select value={v("tipo_uso")} onChange={(x) => set("tipo_uso", x)} options={TIPO_USO_OPCOES} />
             </Field>
             <Field label="Descrição (se Misto)">
-              <input className={inputClass} value={v("descricao_uso_misto")} onChange={(e) => set("descricao_uso_misto", e.target.value)} />
+              <UpperInput value={v("descricao_uso_misto")} onChange={(x) => set("descricao_uso_misto", x)} />
             </Field>
           </>
         )}
@@ -419,7 +530,7 @@ export default function CadastroForm({ initialData, cadastroId }: Props) {
               </Field>
             ))}
             <Field label="Outros Documentos (descrever)">
-              <textarea className={inputClass} value={v("outros_documentos")} onChange={(e) => set("outros_documentos", e.target.value)} />
+              <UpperInput textarea value={v("outros_documentos")} onChange={(x) => set("outros_documentos", x)} />
             </Field>
           </>
         )}
@@ -433,15 +544,27 @@ export default function CadastroForm({ initialData, cadastroId }: Props) {
               <input type="date" className={inputClass} value={v("data_aceite")} onChange={(e) => set("data_aceite", e.target.value)} />
             </Field>
             <Field label="Responsável pela Coleta">
-              <input className={inputClass} placeholder="Nome do agente" value={v("responsavel_coleta")} onChange={(e) => set("responsavel_coleta", e.target.value)} />
+              <Select value={v("responsavel_coleta")} onChange={(x) => set("responsavel_coleta", x)} options={CADASTRADORAS} />
             </Field>
             <Field label="Observações LGPD">
-              <textarea className={inputClass} value={v("observacoes_lgpd")} onChange={(e) => set("observacoes_lgpd", e.target.value)} />
+              <UpperInput textarea value={v("observacoes_lgpd")} onChange={(x) => set("observacoes_lgpd", x)} />
             </Field>
-            <p className="text-xs text-gray-500 mt-2">
-              Anexos de documentos (PDF/JPG/PNG) podem ser adicionados posteriormente via um bucket
-              do Supabase Storage — não incluído nesta versão inicial.
-            </p>
+            <div className="mt-4">
+              <label className="block text-sm text-gray-700 mb-1">
+                📎 Anexar Documentos (PDF, JPG, PNG)
+              </label>
+              {cadastroId ? (
+                <AttachmentUploader
+                  cadastroId={cadastroId}
+                  anexos={(d.anexos as Anexo[]) || []}
+                  onChange={(anexos) => set("anexos", anexos)}
+                />
+              ) : (
+                <p className="text-xs text-gray-500">
+                  Salve o cadastro primeiro (botão abaixo) para depois anexar documentos na edição.
+                </p>
+              )}
+            </div>
           </>
         )}
 

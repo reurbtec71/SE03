@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 
-export default function Header({ title }: { title: string }) {
+export default function Header({
+  title, municipioFiltro,
+}: { title: string; municipioFiltro?: string }) {
   const pathname = usePathname();
   const router = useRouter();
 
@@ -17,6 +19,8 @@ export default function Header({ title }: { title: string }) {
     { href: "/", label: "📋 Cadastros" },
     { href: "/dashboard", label: "📊 Dashboard" },
   ];
+
+  const qs = municipioFiltro ? `?municipio=${encodeURIComponent(municipioFiltro)}` : "";
 
   return (
     <div className="bg-white border-b">
@@ -35,10 +39,18 @@ export default function Header({ title }: { title: string }) {
             + Novo
           </Link>
           <a
-            href="/api/export"
+            href={`/api/export${qs}`}
             className="bg-white/10 hover:bg-white/20 rounded-md px-3 py-1.5 text-sm font-semibold"
+            title="Exportar dados (CSV)"
           >
-            ↓ Exportar
+            ↓ CSV
+          </a>
+          <a
+            href={`/api/export-anexos${qs}`}
+            className="bg-white/10 hover:bg-white/20 rounded-md px-3 py-1.5 text-sm font-semibold"
+            title="Baixar anexos em pastas por pessoa (ZIP)"
+          >
+            ↓ Anexos
           </a>
           <button
             onClick={sair}
