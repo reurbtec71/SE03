@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase";
-import { isAuthenticated } from "@/lib/auth";
+import { isAuthenticated, requireCoordenador } from "@/lib/auth";
 
 function pad(value: string | undefined, len: number) {
   return (value || "").toString().padStart(len, "0");
@@ -17,8 +17,8 @@ function buildInscricao(body: Record<string, unknown>) {
 }
 
 export async function GET(req: NextRequest) {
-  if (!(await isAuthenticated())) {
-    return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
+  if (!(await requireCoordenador())) {
+    return NextResponse.json({ error: "Acesso restrito ao coordenador." }, { status: 403 });
   }
 
   const { searchParams } = new URL(req.url);

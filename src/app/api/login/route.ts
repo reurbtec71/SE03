@@ -4,9 +4,9 @@ import { checkPassword, createSession } from "@/lib/auth";
 export async function POST(req: NextRequest) {
   const { senha } = await req.json();
 
-  let ok = false;
+  let role;
   try {
-    ok = checkPassword(senha || "");
+    role = checkPassword(senha || "");
   } catch (e) {
     return NextResponse.json(
       { error: (e as Error).message },
@@ -14,10 +14,10 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  if (!ok) {
+  if (!role) {
     return NextResponse.json({ error: "Senha incorreta." }, { status: 401 });
   }
 
-  await createSession();
-  return NextResponse.json({ ok: true });
+  await createSession(role);
+  return NextResponse.json({ ok: true, role });
 }

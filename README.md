@@ -27,7 +27,8 @@ Copie `.env.example` para `.env.local` e preencha:
 ```
 SUPABASE_URL=...
 SUPABASE_SERVICE_ROLE_KEY=...
-ACCESS_PASSWORD=escolha-uma-senha-forte     # senha única de login do sistema
+ACCESS_PASSWORD_AGENTE=senha-das-cadastradoras       # só acessa a tela de cadastro
+ACCESS_PASSWORD_COORDENADOR=senha-do-coordenador     # acesso completo (painel + dashboard)
 SESSION_SECRET=string-aleatoria-longa
 ```
 
@@ -38,7 +39,9 @@ npm install
 npm run dev
 ```
 
-Acesse http://localhost:3000 e entre com a senha definida em `ACCESS_PASSWORD`.
+Acesse http://localhost:3000 — a senha que você digitar decide o que aparece:
+`ACCESS_PASSWORD_AGENTE` leva direto à tela de cadastro (S1 a S10, sem painel);
+`ACCESS_PASSWORD_COORDENADOR` dá acesso completo (painel, dashboard, exportações, edição).
 
 ## 4. Publicar na Vercel
 
@@ -65,6 +68,8 @@ A inscrição do imóvel é gerada automaticamente concatenando
 
 ## Recursos do painel
 
+- Duas senhas de acesso: a das cadastradoras só abre a tela de cadastro; a do
+  coordenador dá acesso completo (painel, dashboard, edição, exclusão, exportações).
 - Cadastro em 10 seções, com maiúsculas automáticas nos campos de texto livre
   (nomes, endereços, descrições) e máscara de CPF (`000.000.000-00`).
 - Campos de "Agente de Campo", "Coordenador" e "Responsável pela Coleta" usam
@@ -83,5 +88,6 @@ A inscrição do imóvel é gerada automaticamente concatenando
 
 - Geração de documentos/relatórios (fichas, boletins de medição) — o sistema de origem
   também não fazia isso; ele é só cadastro.
-- Cadastro de usuários/agentes por login individual — hoje é uma senha única
-  compartilhada, igual ao sistema de referência.
+- Cadastro de usuários/agentes por login individual — hoje são duas senhas
+  compartilhadas por nível de acesso (agente / coordenador), sem identificar
+  qual pessoa específica logou.

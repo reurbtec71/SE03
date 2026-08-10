@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase";
-import { isAuthenticated } from "@/lib/auth";
+import { requireCoordenador } from "@/lib/auth";
 import JSZip from "jszip";
 
 const BUCKET = "anexos";
@@ -17,8 +17,8 @@ function sanitize(name: string) {
 }
 
 export async function GET(req: NextRequest) {
-  if (!(await isAuthenticated())) {
-    return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
+  if (!(await requireCoordenador())) {
+    return NextResponse.json({ error: "Acesso restrito ao coordenador." }, { status: 403 });
   }
 
   const { searchParams } = new URL(req.url);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   MUNICIPIOS, UFS, CONTAGEM_OPCOES, NACIONALIDADE_OPCOES, SEXO_OPCOES,
@@ -188,10 +188,20 @@ export default function CadastroForm({ initialData, cadastroId }: Props) {
   const [secao, setSecao] = useState(0);
   const [saving, setSaving] = useState(false);
   const [erro, setErro] = useState("");
+  const [sucesso, setSucesso] = useState(false);
+  const [role, setRole] = useState<string | null>(null);
   const [d, setD] = useState<Record<string, unknown>>(initialData || {});
+
+  useEffect(() => {
+    fetch("/api/me")
+      .then((r) => r.json())
+      .then((b) => setRole(b.role))
+      .catch(() => {});
+  }, []);
 
   function set(key: string, value: unknown) {
     setD((prev) => ({ ...prev, [key]: value }));
+    setSucesso(false);
   }
   const v = (key: string) => (d[key] as string) ?? "";
   const vb = (key: string) => (d[key] as boolean) ?? false;
@@ -199,6 +209,7 @@ export default function CadastroForm({ initialData, cadastroId }: Props) {
   async function salvar() {
     setSaving(true);
     setErro("");
+    setSucesso(false);
     try {
       const url = cadastroId ? `/api/cadastros/${cadastroId}` : "/api/cadastros";
       const method = cadastroId ? "PUT" : "POST";
@@ -212,6 +223,14 @@ export default function CadastroForm({ initialData, cadastroId }: Props) {
         setErro(body.error || "Erro ao salvar cadastro.");
         return;
       }
+      if (role === "agente") {
+        // Agente não acessa o painel — mantém na tela de cadastro para lançar o próximo.
+        setD({});
+        setSecao(0);
+        setSucesso(true);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        return;
+      }
       router.push("/");
       router.refresh();
     } finally {
@@ -221,6 +240,11 @@ export default function CadastroForm({ initialData, cadastroId }: Props) {
 
   return (
     <div className="max-w-3xl mx-auto py-6 px-4">
+      {sucesso && (
+        <div className="bg-green-50 text-green-800 text-sm font-medium rounded-md px-4 py-2 mb-4 border border-green-200">
+          ✓ Cadastro salvo com sucesso! Você já pode lançar o próximo.
+        </div>
+      )}
       <div className="bg-blue-50 text-navy text-sm font-medium rounded-md px-4 py-2 mb-4">
         Inscrição: {v("inscricao") || "—"}
       </div>

@@ -24,7 +24,8 @@ export default function LoginPage() {
         setErro(body.error || "Não foi possível entrar.");
         return;
       }
-      router.push("/");
+      const body = await res.json();
+      router.push(body.role === "coordenador" ? "/" : "/novo");
       router.refresh();
     } finally {
       setLoading(false);
