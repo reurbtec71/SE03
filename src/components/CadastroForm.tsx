@@ -189,6 +189,53 @@ function AttachmentUploader({
   );
 }
 
+function FilePickerLocal({
+  arquivos, onChange,
+}: { arquivos: File[]; onChange: (f: File[]) => void }) {
+  function adicionar(files: FileList | null) {
+    if (!files || files.length === 0) return;
+    onChange([...arquivos, ...Array.from(files)]);
+  }
+  function remover(idx: number) {
+    onChange(arquivos.filter((_, i) => i !== idx));
+  }
+  return (
+    <div>
+      <input
+        type="file"
+        multiple
+        accept=".pdf,.jpg,.jpeg,.png,image/*"
+        capture="environment"
+        onChange={(e) => {
+          adicionar(e.target.files);
+          e.target.value = "";
+        }}
+        className="text-sm mb-2"
+      />
+      <p className="text-xs text-gray-400 mb-2">
+        No celular, essa opção também abre a câmera para foto direto na visita.
+        Os arquivos são enviados junto quando você clicar em &quot;Salvar Cadastro&quot;.
+      </p>
+      {arquivos.length > 0 && (
+        <ul className="text-sm mt-2 space-y-1">
+          {arquivos.map((f, i) => (
+            <li key={`${f.name}_${i}`} className="flex items-center justify-between bg-gray-50 border rounded px-2 py-1">
+              <span className="truncate">{f.name}</span>
+              <button
+                type="button"
+                onClick={() => remover(i)}
+                className="text-red-600 text-xs font-semibold ml-2"
+              >
+                remover
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 export default function CadastroForm({ initialData, cadastroId }: Props) {
   const router = useRouter();
   const [secao, setSecao] = useState(0);
@@ -198,6 +245,7 @@ export default function CadastroForm({ initialData, cadastroId }: Props) {
   const [role, setRole] = useState<string | null>(null);
   const [d, setD] = useState<Record<string, unknown>>(initialData || {});
   const [savedId, setSavedId] = useState<string | undefined>(cadastroId);
+  const [arquivosPendentes, setArquivosPendentes] = useState<File[]>([]);
 
   useEffect(() => {
     fetch("/api/me")
@@ -231,13 +279,28 @@ export default function CadastroForm({ initialData, cadastroId }: Props) {
         return;
       }
       const body = await res.json();
+      const novoId = body.data.id as string;
+
+      if (arquivosPendentes.length > 0) {
+        const form = new FormData();
+        arquivosPendentes.forEach((f) => form.append("files", f));
+        const resAnexo = await fetch(`/api/anexos/${novoId}`, { method: "POST", body: form });
+        if (!resAnexo.ok) {
+          const b = await resAnexo.json().catch(() => ({}));
+          setErro(
+            `Cadastro salvo, mas houve erro ao enviar os anexos: ${b.error || "erro desconhecido"}`
+          );
+          setSavedId(novoId);
+          return;
+        }
+      }
 
       if (role === "agente") {
-        // Agente não acessa o painel — fica na S10 para anexar fotos do cadastro
-        // que acabou de criar, antes de liberar pro próximo.
-        setD((prev) => ({ ...prev, ...body.data }));
-        setSavedId(body.data.id);
-        setSecao(SECOES.length - 1);
+        // Agente não acessa o painel — reseta a tela pronta para o próximo cadastro.
+        setD({});
+        setSavedId(undefined);
+        setArquivosPendentes([]);
+        setSecao(0);
         setSucesso(true);
         window.scrollTo({ top: 0, behavior: "smooth" });
         return;
@@ -249,19 +312,11 @@ export default function CadastroForm({ initialData, cadastroId }: Props) {
     }
   }
 
-  function novoCadastro() {
-    setD({});
-    setSavedId(undefined);
-    setSecao(0);
-    setSucesso(false);
-  }
-
   return (
     <div className="max-w-3xl mx-auto py-6 px-4">
       {sucesso && (
         <div className="bg-green-50 text-green-800 text-sm font-medium rounded-md px-4 py-2 mb-4 border border-green-200">
-          ✓ Cadastro salvo! Anexe as fotos/documentos abaixo (seção S10) e depois clique em
-          &quot;+ Novo Cadastro&quot; para lançar o próximo.
+          ✓ Cadastro salvo com sucesso (com os anexos, se houver)! Você já pode lançar o próximo.
         </div>
       )}
       <div className="bg-blue-50 text-navy text-sm font-medium rounded-md px-4 py-2 mb-4">
@@ -604,10 +659,7 @@ export default function CadastroForm({ initialData, cadastroId }: Props) {
                   podeRemover={role === "coordenador"}
                 />
               ) : (
-                <p className="text-xs text-gray-500">
-                  Clique em &quot;✓ Salvar Cadastro&quot; abaixo primeiro — depois de salvo,
-                  o campo de anexar arquivos aparece aqui mesmo, sem sair da tela.
-                </p>
+                <FilePickerLocal arquivos={arquivosPendentes} onChange={setArquivosPendentes} />
               )}
             </div>
           </>
@@ -629,13 +681,6 @@ export default function CadastroForm({ initialData, cadastroId }: Props) {
               className="btn-primary px-4 py-2 text-sm font-semibold rounded-md"
             >
               Próximo →
-            </button>
-          ) : role === "agente" && sucesso && savedId ? (
-            <button
-              onClick={novoCadastro}
-              className="btn-accent px-4 py-2 text-sm font-semibold rounded-md"
-            >
-              + Novo Cadastro
             </button>
           ) : (
             <button
