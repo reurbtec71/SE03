@@ -114,8 +114,8 @@ function CpfInput({ value, onChange }: { value: string; onChange: (v: string) =>
 type Anexo = { nome: string; path: string; tamanho: number };
 
 function AttachmentUploader({
-  cadastroId, anexos, onChange,
-}: { cadastroId: string; anexos: Anexo[]; onChange: (a: Anexo[]) => void }) {
+  cadastroId, anexos, onChange, podeRemover,
+}: { cadastroId: string; anexos: Anexo[]; onChange: (a: Anexo[]) => void; podeRemover: boolean }) {
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState("");
 
@@ -156,11 +156,15 @@ function AttachmentUploader({
       <input
         type="file"
         multiple
-        accept=".pdf,.jpg,.jpeg,.png"
+        accept=".pdf,.jpg,.jpeg,.png,image/*"
+        capture="environment"
         onChange={(e) => handleFiles(e.target.files)}
         disabled={enviando}
         className="text-sm mb-2"
       />
+      <p className="text-xs text-gray-400 mb-2">
+        No celular, essa opção também abre a câmera para foto direto na visita.
+      </p>
       {enviando && <p className="text-xs text-gray-500">Enviando...</p>}
       {erro && <p className="text-xs text-red-600">{erro}</p>}
       {anexos.length > 0 && (
@@ -168,13 +172,15 @@ function AttachmentUploader({
           {anexos.map((a) => (
             <li key={a.path} className="flex items-center justify-between bg-gray-50 border rounded px-2 py-1">
               <span className="truncate">{a.nome}</span>
-              <button
-                type="button"
-                onClick={() => remover(a.path)}
-                className="text-red-600 text-xs font-semibold ml-2"
-              >
-                remover
-              </button>
+              {podeRemover && (
+                <button
+                  type="button"
+                  onClick={() => remover(a.path)}
+                  className="text-red-600 text-xs font-semibold ml-2"
+                >
+                  remover
+                </button>
+              )}
             </li>
           ))}
         </ul>
@@ -191,6 +197,7 @@ export default function CadastroForm({ initialData, cadastroId }: Props) {
   const [sucesso, setSucesso] = useState(false);
   const [role, setRole] = useState<string | null>(null);
   const [d, setD] = useState<Record<string, unknown>>(initialData || {});
+  const [savedId, setSavedId] = useState<string | undefined>(cadastroId);
 
   useEffect(() => {
     fetch("/api/me")
@@ -211,8 +218,8 @@ export default function CadastroForm({ initialData, cadastroId }: Props) {
     setErro("");
     setSucesso(false);
     try {
-      const url = cadastroId ? `/api/cadastros/${cadastroId}` : "/api/cadastros";
-      const method = cadastroId ? "PUT" : "POST";
+      const url = savedId ? `/api/cadastros/${savedId}` : "/api/cadastros";
+      const method = savedId ? "PUT" : "POST";
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
@@ -223,10 +230,14 @@ export default function CadastroForm({ initialData, cadastroId }: Props) {
         setErro(body.error || "Erro ao salvar cadastro.");
         return;
       }
+      const body = await res.json();
+
       if (role === "agente") {
-        // Agente não acessa o painel — mantém na tela de cadastro para lançar o próximo.
-        setD({});
-        setSecao(0);
+        // Agente não acessa o painel — fica na S10 para anexar fotos do cadastro
+        // que acabou de criar, antes de liberar pro próximo.
+        setD((prev) => ({ ...prev, ...body.data }));
+        setSavedId(body.data.id);
+        setSecao(SECOES.length - 1);
         setSucesso(true);
         window.scrollTo({ top: 0, behavior: "smooth" });
         return;
@@ -238,11 +249,19 @@ export default function CadastroForm({ initialData, cadastroId }: Props) {
     }
   }
 
+  function novoCadastro() {
+    setD({});
+    setSavedId(undefined);
+    setSecao(0);
+    setSucesso(false);
+  }
+
   return (
     <div className="max-w-3xl mx-auto py-6 px-4">
       {sucesso && (
         <div className="bg-green-50 text-green-800 text-sm font-medium rounded-md px-4 py-2 mb-4 border border-green-200">
-          ✓ Cadastro salvo com sucesso! Você já pode lançar o próximo.
+          ✓ Cadastro salvo! Anexe as fotos/documentos abaixo (seção S10) e depois clique em
+          &quot;+ Novo Cadastro&quot; para lançar o próximo.
         </div>
       )}
       <div className="bg-blue-50 text-navy text-sm font-medium rounded-md px-4 py-2 mb-4">
@@ -575,17 +594,19 @@ export default function CadastroForm({ initialData, cadastroId }: Props) {
             </Field>
             <div className="mt-4">
               <label className="block text-sm text-gray-700 mb-1">
-                📎 Anexar Documentos (PDF, JPG, PNG)
+                📎 Anexar Documentos / Registro Fotográfico (PDF, JPG, PNG)
               </label>
-              {cadastroId ? (
+              {savedId ? (
                 <AttachmentUploader
-                  cadastroId={cadastroId}
+                  cadastroId={savedId}
                   anexos={(d.anexos as Anexo[]) || []}
                   onChange={(anexos) => set("anexos", anexos)}
+                  podeRemover={role === "coordenador"}
                 />
               ) : (
                 <p className="text-xs text-gray-500">
-                  Salve o cadastro primeiro (botão abaixo) para depois anexar documentos na edição.
+                  Clique em &quot;✓ Salvar Cadastro&quot; abaixo primeiro — depois de salvo,
+                  o campo de anexar arquivos aparece aqui mesmo, sem sair da tela.
                 </p>
               )}
             </div>
@@ -608,6 +629,13 @@ export default function CadastroForm({ initialData, cadastroId }: Props) {
               className="btn-primary px-4 py-2 text-sm font-semibold rounded-md"
             >
               Próximo →
+            </button>
+          ) : role === "agente" && sucesso && savedId ? (
+            <button
+              onClick={novoCadastro}
+              className="btn-accent px-4 py-2 text-sm font-semibold rounded-md"
+            >
+              + Novo Cadastro
             </button>
           ) : (
             <button

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase";
-import { requireCoordenador } from "@/lib/auth";
+import { isAuthenticated, requireCoordenador } from "@/lib/auth";
 
 const BUCKET = "anexos";
 
@@ -17,8 +17,8 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  if (!(await requireCoordenador())) {
-    return NextResponse.json({ error: "Acesso restrito ao coordenador." }, { status: 403 });
+  if (!(await isAuthenticated())) {
+    return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
   }
   const { id } = await params;
   const supabase = getSupabaseServer();
