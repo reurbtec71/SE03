@@ -13,6 +13,31 @@ async function ensureBucket(supabase: ReturnType<typeof getSupabaseServer>) {
   }
 }
 
+export async function GET(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  if (!(await isAuthenticated())) {
+    return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
+  }
+  const { id } = await params;
+  const { searchParams } = new URL(req.url);
+  const path = searchParams.get("path");
+  if (!path || !path.startsWith(`${id}/`)) {
+    return NextResponse.json({ error: "Caminho de arquivo inválido." }, { status: 400 });
+  }
+
+  const supabase = getSupabaseServer();
+  const { data, error } = await supabase.storage
+    .from(BUCKET)
+    .createSignedUrl(path, 60 * 10); // link válido por 10 minutos
+
+  if (error || !data) {
+    return NextResponse.json({ error: error?.message || "Erro ao gerar link." }, { status: 500 });
+  }
+  return NextResponse.json({ url: data.signedUrl });
+}
+
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }

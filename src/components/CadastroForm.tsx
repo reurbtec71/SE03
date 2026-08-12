@@ -13,6 +13,7 @@ import {
   CADASTRADORAS,
 } from "@/lib/constants";
 import { maskCPF } from "@/lib/format";
+import { compressImage } from "@/lib/image";
 
 type Props = {
   initialData?: Record<string, unknown>;
@@ -124,16 +125,22 @@ function AttachmentUploader({
     setEnviando(true);
     setErro("");
     try {
-      const form = new FormData();
-      Array.from(files).forEach((f) => form.append("files", f));
-      const res = await fetch(`/api/anexos/${cadastroId}`, { method: "POST", body: form });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        setErro(body.error || "Erro ao enviar arquivo(s).");
-        return;
+      for (const original of Array.from(files)) {
+        const file = await compressImage(original);
+        const form = new FormData();
+        form.append("files", file);
+        const res = await fetch(`/api/anexos/${cadastroId}`, { method: "POST", body: form });
+        if (!res.ok) {
+          const b = await res.json().catch(() => null);
+          setErro(
+            (b && b.error) ||
+              `Falha ao enviar "${original.name}" (HTTP ${res.status}). Tente uma foto menor.`
+          );
+          continue;
+        }
+        const body = await res.json();
+        onChange(body.anexos);
       }
-      const body = await res.json();
-      onChange(body.anexos);
     } finally {
       setEnviando(false);
     }
@@ -149,6 +156,16 @@ function AttachmentUploader({
       const body = await res.json();
       onChange(body.anexos);
     }
+  }
+
+  async function abrir(path: string) {
+    const res = await fetch(`/api/anexos/${cadastroId}?path=${encodeURIComponent(path)}`);
+    if (!res.ok) {
+      setErro("Não foi possível abrir o arquivo.");
+      return;
+    }
+    const body = await res.json();
+    window.open(body.url, "_blank");
   }
 
   return (
@@ -171,12 +188,19 @@ function AttachmentUploader({
         <ul className="text-sm mt-2 space-y-1">
           {anexos.map((a) => (
             <li key={a.path} className="flex items-center justify-between bg-gray-50 border rounded px-2 py-1">
-              <span className="truncate">{a.nome}</span>
+              <button
+                type="button"
+                onClick={() => abrir(a.path)}
+                className="truncate text-navy hover:underline text-left"
+                title="Abrir / baixar"
+              >
+                📎 {a.nome}
+              </button>
               {podeRemover && (
                 <button
                   type="button"
                   onClick={() => remover(a.path)}
-                  className="text-red-600 text-xs font-semibold ml-2"
+                  className="text-red-600 text-xs font-semibold ml-2 shrink-0"
                 >
                   remover
                 </button>
@@ -192,9 +216,19 @@ function AttachmentUploader({
 function FilePickerLocal({
   arquivos, onChange,
 }: { arquivos: File[]; onChange: (f: File[]) => void }) {
-  function adicionar(files: FileList | null) {
+  const [processando, setProcessando] = useState(false);
+
+  async function adicionar(files: FileList | null) {
     if (!files || files.length === 0) return;
-    onChange([...arquivos, ...Array.from(files)]);
+    setProcessando(true);
+    try {
+      const comprimidos = await Promise.all(
+        Array.from(files).map((f) => compressImage(f))
+      );
+      onChange([...arquivos, ...comprimidos]);
+    } finally {
+      setProcessando(false);
+    }
   }
   function remover(idx: number) {
     onChange(arquivos.filter((_, i) => i !== idx));
@@ -210,21 +244,31 @@ function FilePickerLocal({
           adicionar(e.target.files);
           e.target.value = "";
         }}
+        disabled={processando}
         className="text-sm mb-2"
       />
       <p className="text-xs text-gray-400 mb-2">
         No celular, essa opção também abre a câmera para foto direto na visita.
-        Os arquivos são enviados junto quando você clicar em &quot;Salvar Cadastro&quot;.
+        As fotos são reduzidas automaticamente antes do envio. Os arquivos são
+        enviados junto quando você clicar em &quot;Salvar Cadastro&quot;.
       </p>
+      {processando && <p className="text-xs text-gray-500 mb-2">Preparando foto(s)...</p>}
       {arquivos.length > 0 && (
         <ul className="text-sm mt-2 space-y-1">
           {arquivos.map((f, i) => (
             <li key={`${f.name}_${i}`} className="flex items-center justify-between bg-gray-50 border rounded px-2 py-1">
-              <span className="truncate">{f.name}</span>
+              <button
+                type="button"
+                onClick={() => window.open(URL.createObjectURL(f), "_blank")}
+                className="truncate text-navy hover:underline text-left"
+                title="Visualizar"
+              >
+                📎 {f.name} ({(f.size / 1024).toFixed(0)} KB)
+              </button>
               <button
                 type="button"
                 onClick={() => remover(i)}
-                className="text-red-600 text-xs font-semibold ml-2"
+                className="text-red-600 text-xs font-semibold ml-2 shrink-0"
               >
                 remover
               </button>
@@ -280,16 +324,27 @@ export default function CadastroForm({ initialData, cadastroId }: Props) {
       }
       const body = await res.json();
       const novoId = body.data.id as string;
+      setD((prev) => ({ ...prev, ...body.data }));
 
       if (arquivosPendentes.length > 0) {
-        const form = new FormData();
-        arquivosPendentes.forEach((f) => form.append("files", f));
-        const resAnexo = await fetch(`/api/anexos/${novoId}`, { method: "POST", body: form });
-        if (!resAnexo.ok) {
-          const b = await resAnexo.json().catch(() => ({}));
-          setErro(
-            `Cadastro salvo, mas houve erro ao enviar os anexos: ${b.error || "erro desconhecido"}`
-          );
+        let algumErro = "";
+        for (const file of arquivosPendentes) {
+          const form = new FormData();
+          form.append("files", file);
+          const resAnexo = await fetch(`/api/anexos/${novoId}`, { method: "POST", body: form });
+          if (!resAnexo.ok) {
+            const b = await resAnexo.json().catch(() => null);
+            algumErro =
+              (b && b.error) ||
+              `Falha ao enviar "${file.name}" (HTTP ${resAnexo.status}).`;
+            continue;
+          }
+          const anexoBody = await resAnexo.json();
+          setD((prev) => ({ ...prev, anexos: anexoBody.anexos }));
+        }
+        setArquivosPendentes([]);
+        if (algumErro) {
+          setErro(`Cadastro salvo, mas houve erro em pelo menos um anexo: ${algumErro}`);
           setSavedId(novoId);
           return;
         }
